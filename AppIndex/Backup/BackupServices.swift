@@ -101,6 +101,29 @@ public class BackupServices {
 		
 	}
 	 */
+    
+    func clearAppData(application: Application) throws {
+        let applicationContainerURL = application.proxy.containerURL()
+        
+        if applicationContainerURL == URL(fileURLWithPath: "/var/mobile") || applicationContainerURL == URL(fileURLWithPath: "/var/root") {
+            throw StringError(
+                .localized("Can't clear app with a container URL of /var/mobile or /var/root (App likely has no container in the first place to clear), sorry")
+            )
+        }
+        
+        let containerContents = try FileManager.default.contentsOfDirectory(at: applicationContainerURL, includingPropertiesForKeys: nil)
+        for item in containerContents {
+            try FileManager.default.removeItem(at: item)
+        }
+        
+        let groupContainers = application.proxy.groupContainerURLs()
+        for (_, containerURL) in groupContainers {
+            let groupContents = try FileManager.default.contentsOfDirectory(at: containerURL, includingPropertiesForKeys: nil)
+            for item in groupContents {
+                try FileManager.default.removeItem(at: item)
+            }
+        }
+    }
 	
 	func restoreBackup(_ backup: BackupItem) throws {
 		let appWeAreLookingFor = Application.all.first { $0.bundleID == backup.applicationIdentifier }

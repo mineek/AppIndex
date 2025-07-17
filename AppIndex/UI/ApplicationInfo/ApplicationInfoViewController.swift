@@ -97,6 +97,10 @@ class ApplicationInfoViewController: UIViewController {
 		let deleteAction = UIAlertAction(title: .localized("Delete"), style: .destructive) { [unowned self] _ in
 			deleteApp()
 		}
+        
+        let clearDataAction = UIAlertAction(title: .localized("Clear Data"), style: .destructive) { [unowned self] _ in
+            clearAppData()
+        }
 		
 		let backupAction = UIAlertAction(title: .localized("Backup"), style: .default) { [unowned self] _ in
 			backupApp()
@@ -117,6 +121,7 @@ class ApplicationInfoViewController: UIViewController {
 		}
 		alert.addAction(backupAction)
 		if app.proxy.isDeletable {
+            alert.addAction(clearDataAction)
 			alert.addAction(deleteAction)
 		}
 		
@@ -150,8 +155,12 @@ class ApplicationInfoViewController: UIViewController {
 				let deleteAction = UIAction(title: .localized("Delete"), attributes: .destructive) { [unowned self] _ in
 					deleteApp()
 				}
+                
+                let clearDataAction = UIAction(title: .localized("Clear Data"), attributes: .destructive) { [unowned self] _ in
+                    clearAppData()
+                }
 				
-				children.append(UIMenu(options: .displayInline, children: [deleteAction]))
+				children.append(UIMenu(options: .displayInline, children: [clearDataAction, deleteAction]))
 			}
 			
 			tableHeaderView.actionsButton.showsMenuAsPrimaryAction = true
@@ -229,6 +238,53 @@ extension ApplicationInfoViewController {
 			}
 		}
 	}
+    
+    func clearAppData() {
+        let confirmAlert = UIAlertController(
+            title: .localized("Clear App Data"),
+            message: .localizedStringWithFormat(.localized("This will permanently delete all data for %@, including documents, settings, and other files. The app itself will remain installed. Are you sure you want to do this?"), app.name),
+            preferredStyle: .alert
+        )
+        
+        let clearAction = UIAlertAction(title: .localized("Clear Data"), style: .destructive) { [unowned self] _ in
+            performClearAppData()
+        }
+        
+        let cancelAction = UIAlertAction(title: .localized("Cancel"), style: .cancel)
+        
+        confirmAlert.addAction(clearAction)
+        confirmAlert.addAction(cancelAction)
+        present(confirmAlert, animated: true)
+    }
+        
+    private func performClearAppData() {
+        let spinner = presentAlertWithSpinner(title: .localized("Clearing"), heightAnchor: 120)
+        
+        DispatchQueue.global(qos: .background).async { [unowned self] in
+            do {
+                try BackupServices.shared.clearAppData(application: app)
+                
+                DispatchQueue.main.async {
+                    spinner.dismiss(animated: true) { [unowned self] in
+                        let successAlert = UIAlertController(
+                            title: .localized("Data Cleared"),
+                            message: .localizedStringWithFormat(.localized("All data for %@ has been successfully wiped"), app.name),
+                            preferredStyle: .alert
+                        )
+                        successAlert.addAction(UIAlertAction(title: .localized("OK"), style: .default))
+                        present(successAlert, animated: true)
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    spinner.dismiss(animated: true) { [unowned self] in
+                        errorAlert(title: .localizedStringWithFormat(.localized("Failed to clear all app data for %@"), app.name),
+                                   message: error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
 }
 
 extension ApplicationInfoViewController {
